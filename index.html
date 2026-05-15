@@ -5,14 +5,243 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>A-Frame VR Scene</title>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/ngokevin/aframe-look-at-component@3.0.0/dist/aframe-look-at-component.min.js"></script>
+    <script>
+        AFRAME.registerComponent('sprite-sheet-anim', {
+            schema: {
+                rows: {type: 'int', default: 1},
+                columns: {type: 'int', default: 5},
+                frameRate: {type: 'number', default: 6},
+                loop: {type: 'boolean', default: true}
+            },
+            init: function () {
+                const material = this.el.getObject3D('mesh').material;
+                if (material) {
+                    material.transparent = true;
+                    material.alphaTest = 0.5;
+                    material.depthWrite = false;
+                }
+                this.currentFrame = 0;
+                this.elapsed = 0;
+                this.frameDuration = 1000 / this.data.frameRate;
+                this.totalFrames = this.data.rows * this.data.columns;
+                this.el.setAttribute('material', 'repeat', `${1 / this.data.columns} ${1 / this.data.rows}`);
+                this.updateFrame();
+            },
+            tick: function (time, delta) {
+                this.elapsed += delta;
+                if (this.elapsed < this.frameDuration) { return; }
+                this.elapsed -= this.frameDuration;
+                this.currentFrame = (this.currentFrame + 1) % this.totalFrames;
+                this.updateFrame();
+            },
+            updateFrame: function () {
+                const column = this.currentFrame % this.data.columns;
+                const row = Math.floor(this.currentFrame / this.data.columns);
+                this.el.setAttribute('material', 'offset', `${column / this.data.columns} ${(this.data.rows - 1 - row) / this.data.rows}`);
+            }
+        });
+
+        AFRAME.registerComponent('face-camera', {
+            init: function () {
+                this.cameraEl = document.querySelector('#camera');
+                this.targetPosition = new THREE.Vector3();
+                this.selfPosition = new THREE.Vector3();
+                this.direction = new THREE.Vector3();
+            },
+            tick: function () {
+                if (!this.cameraEl || !this.cameraEl.object3D) { return; }
+                this.cameraEl.object3D.getWorldPosition(this.targetPosition);
+                this.el.object3D.getWorldPosition(this.selfPosition);
+                this.direction.copy(this.targetPosition).sub(this.selfPosition);
+                var angle = Math.atan2(this.direction.x, this.direction.z) * 180 / Math.PI;
+                this.el.setAttribute('rotation', {x: 0, y: angle, z: 0});
+            }
+        });
+
+        AFRAME.registerComponent('random-walker', {
+            schema: {
+                radius: {type: 'number', default: 15},
+                speed: {type: 'number', default: 1},
+                changeInterval: {type: 'number', default: 3000}
+            },
+            init: function () {
+                this.target = new THREE.Vector3();
+                this.direction = new THREE.Vector3();
+                this.elapsed = 0;
+                this.setNewTarget();
+            },
+            setNewTarget: function () {
+                var x = (Math.random() * 2 - 1) * this.data.radius;
+                var z = (Math.random() * 2 - 1) * this.data.radius;
+                this.target.set(x, 0, z);
+                var pos = this.el.getAttribute('position');
+                this.direction.set(
+                    this.target.x - pos.x,
+                    0,
+                    this.target.z - pos.z
+                );
+                this.direction.y = 0;
+                var distance = this.direction.length();
+                if (distance > 0.001) {
+                    this.direction.normalize();
+                    var angle = Math.atan2(this.direction.x, this.direction.z) * 180 / Math.PI;
+                    this.el.setAttribute('rotation', {x: 0, y: angle, z: 0});
+                }
+            },
+            tick: function (time, delta) {
+                var pos = this.el.getAttribute('position');
+                var moveDistance = this.data.speed * (delta / 1000);
+                pos.x += this.direction.x * moveDistance;
+                pos.z += this.direction.z * moveDistance;
+                this.el.setAttribute('position', pos);
+                this.elapsed += delta;
+                var dx = this.target.x - pos.x;
+                var dz = this.target.z - pos.z;
+                var distance = Math.sqrt(dx * dx + dz * dz);
+                if (distance < 0.2 || this.elapsed > this.data.changeInterval) {
+                    this.elapsed = 0;
+                    this.setNewTarget();
+                }
+            }
+        });
+
+        AFRAME.registerComponent('character-spawner', {
+            schema: {
+                count: {type: 'int', default: 10},
+                radius: {type: 'number', default: 15}
+            },
+            init: function () {
+                if (this.el.hasLoaded) {
+                    this.spawnCharacters();
+                } else {
+                    this.el.addEventListener('loaded', this.spawnCharacters.bind(this));
+                }
+            },
+            spawnCharacters: function () {
+                for (var i = 0; i < this.data.count; i++) {
+                    var x = (Math.random() * 2 - 1) * this.data.radius;
+                    var z = (Math.random() * 2 - 1) * this.data.radius;
+                    var character = document.createElement('a-entity');
+                    character.setAttribute('position', x + ' 1.2 ' + z);
+                    character.setAttribute('face-camera', '');
+                    character.setAttribute('random-walker', 'radius: ' + this.data.radius + '; speed: ' + (0.6 + Math.random() * 0.6) + '; changeInterval: ' + (2000 + Math.random() * 3000));
+
+                    var plane = document.createElement('a-plane');
+                    plane.setAttribute('width', '1');
+                    plane.setAttribute('height', '1.6');
+                    plane.setAttribute('material', 'shader: flat; src: #havelSprite; transparent: true; alphaTest: 0.5; repeat: 0.2 1');
+                    plane.setAttribute('sprite-sheet-anim', 'rows: 1; columns: 5; frameRate: 6; loop: true');
+                    plane.setAttribute('position', '0 0 0');
+                    character.appendChild(plane);
+
+                    this.el.appendChild(character);
+                }
+            }
+        });
+
+        AFRAME.registerComponent('quote-displayer', {
+            init: function () {
+                this.quotes = [];
+                this.quoteGroup = document.querySelector('#quoteGroup');
+                this.quoteText = document.querySelector('#quoteText');
+                this.soundEl = document.querySelector('#quoteSound');
+                this.audioAsset = this.createAudioAsset();
+                window.addEventListener('pointerdown', this.unlockAudio.bind(this), { once: true });
+                fetch('assets/citaty.txt')
+                    .then(function (response) { return response.text(); })
+                    .then(function (text) {
+                        this.quotes = text.split(/\r?\n/).map(function (line) { return line.trim(); }).filter(Boolean);
+                        if (this.quotes.length) {
+                            this.showQuote();
+                            this.interval = setInterval(this.showQuote.bind(this), 5000);
+                        }
+                    }.bind(this));
+            },
+            createAudioAsset: function () {
+                var audio = new Audio();
+                audio.preload = 'auto';
+                audio.crossOrigin = 'anonymous';
+                audio.muted = false;
+                audio.volume = 1.0;
+                if (audio.canPlayType('audio/ogg')) {
+                    audio.src = 'assets/myslim_si_ze.ogg';
+                } else if (audio.canPlayType('audio/mpeg')) {
+                    audio.src = 'assets/myslim_si_ze.mp3';
+                } else {
+                    audio.src = 'assets/myslim_si_ze.wav';
+                }
+                audio.load();
+                return audio;
+            },
+            unlockAudio: function () {
+                if (!this.audioAsset) { return; }
+                this.audioAsset.currentTime = 0;
+                this.audioAsset.play().then(function () {
+                    this.audioAsset.pause();
+                    this.audioAsset.currentTime = 0;
+                }.bind(this)).catch(function () {});
+            },
+            showQuote: function () {
+                if (!this.quotes.length) { return; }
+                var quote = this.quotes[Math.floor(Math.random() * this.quotes.length)];
+                this.quoteText.setAttribute('text', 'value', quote);
+                this.quoteGroup.setAttribute('visible', 'true');
+                if (this.soundEl && this.soundEl.components && this.soundEl.components.sound) {
+                    this.soundEl.components.sound.playSound();
+                }
+                if (this.audioAsset) {
+                    this.audioAsset.currentTime = 0;
+                    this.audioAsset.play().catch(function () {});
+                }
+                clearTimeout(this.hideTimeout);
+                this.hideTimeout = setTimeout(function () {
+                    this.quoteGroup.setAttribute('visible', 'false');
+                }.bind(this), 4000);
+            },
+            remove: function () {
+                clearInterval(this.interval);
+                clearTimeout(this.hideTimeout);
+            }
+        });
+    </script>
 </head>
 <body>
-    <a-scene>
+    <a-scene character-spawner="count: 10; radius: 15">
+        <a-assets>
+            <img id="havelSprite" src="assets/havel_walk_1.png" crossorigin="anonymous" />
+            <img id="panorama" src="assets/panorama1.png" crossorigin="anonymous" />
+            <audio id="quoteSoundAsset" crossorigin="anonymous" preload="auto">
+                <source src="assets/myslim_si_ze.ogg" type="audio/ogg">
+                <source src="assets/myslim_si_ze.mp3" type="audio/mpeg">
+                <source src="assets/myslim_si_ze.wav" type="audio/wav">
+            </audio>
+        </a-assets>
+
+        <a-entity id="cameraRig" position="0 1.6 0">
+            <a-entity id="camera" camera look-controls wasd-controls="acceleration: 50" position="0 0 0"></a-entity>
+        </a-entity>
+
+        <a-entity id="quoteGroup" position="0 2.4 -2" visible="false" face-camera quote-displayer>
+            <a-plane width="2.6" height="0.8" color="#000" opacity="0.6" position="0 0 0"></a-plane>
+            <a-entity id="quoteText" position="0 0 0.01"
+                      text="value: ; align: center; width: 2.4; color: #fff; wrapCount: 40; font: https://cdn.aframe.io/fonts/DejaVu-sdf.fnt">
+            </a-entity>
+            <a-entity id="quoteSound" sound="src: #quoteSoundAsset; autoplay: false"></a-entity>
+        </a-entity>
+
         <!-- Green ground plane -->
-        <a-plane position="0 0 0" rotation="-90 0 0" width="100" height="100" color="green"></a-plane>
+        <a-plane position="0 0 0" rotation="-90 0 0" width="100" height="100" color="#666666"></a-plane>
         
-        <!-- Blue sky -->
-        <a-sky color="blue"></a-sky>
+        <!-- Panorama background -->
+        <a-sky src="#panorama" rotation="0 180 0"></a-sky>
+
+        <!-- Animated character plane always facing the camera -->
+        <a-plane position="0 1.2 -2" width="1" height="1.6"
+                 material="shader: flat; src: #havelSprite; transparent: true; alphaTest: 0.5; repeat: 0.2 1"
+                 face-camera
+                 sprite-sheet-anim="rows: 1; columns: 5; frameRate: 2; loop: true">
+        </a-plane>
     </a-scene>
 </body>
 </html>
