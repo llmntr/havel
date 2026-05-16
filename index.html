@@ -185,7 +185,7 @@
             showQuote: function () {
                 if (!this.quotes.length) { return; }
                 var quote = this.quotes[Math.floor(Math.random() * this.quotes.length)];
-                this.quoteText.setAttribute('text', 'value', quote);
+                this.quoteText.setAttribute('value', quote);
                 this.quoteGroup.setAttribute('visible', 'true');
                 if (this.soundEl && this.soundEl.components && this.soundEl.components.sound) {
                     this.soundEl.components.sound.playSound();
@@ -225,9 +225,7 @@
 
         <a-entity id="quoteGroup" position="0 2.4 -2" visible="false" face-camera quote-displayer>
             <a-plane width="2.6" height="0.8" color="#000" opacity="0.6" position="0 0 0"></a-plane>
-            <a-entity id="quoteText" position="0 0 0.01"
-                      text="value: ; align: center; width: 2.4; color: #fff; wrapCount: 40; font: https://cdn.aframe.io/fonts/DejaVu-sdf.fnt">
-            </a-entity>
+            <a-text id="quoteText" position="0 0 0.01" value="" align="center" width="2.4" color="#fff" font="url(pix_sans.json)"></a-text>
             <a-entity id="quoteSound" sound="src: #quoteSoundAsset; autoplay: false"></a-entity>
         </a-entity>
 
