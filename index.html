@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>A-Frame VR Scene</title>
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/ngokevin/aframe-look-at-component@3.0.0/dist/aframe-look-at-component.min.js"></script>
     <script>
         AFRAME.registerComponent('sprite-sheet-anim', {
@@ -27,8 +27,10 @@
                 this.totalFrames = this.data.rows * this.data.columns;
                 this.el.setAttribute('material', 'repeat', `${1 / this.data.columns} ${1 / this.data.rows}`);
                 this.updateFrame();
+                this.pauseAnim = false;
             },
             tick: function (time, delta) {
+                if (this.pauseAnim) return;
                 this.elapsed += delta;
                 if (this.elapsed < this.frameDuration) { return; }
                 this.elapsed -= this.frameDuration;
@@ -69,6 +71,7 @@
                 this.target = new THREE.Vector3();
                 this.direction = new THREE.Vector3();
                 this.elapsed = 0;
+                this.pauseWalker = false;
                 this.setNewTarget();
             },
             setNewTarget: function () {
@@ -90,6 +93,7 @@
                 }
             },
             tick: function (time, delta) {
+                if (this.pauseWalker) return;
                 var pos = this.el.getAttribute('position');
                 var moveDistance = this.data.speed * (delta / 1000);
                 pos.x += this.direction.x * moveDistance;
@@ -106,9 +110,44 @@
             }
         });
 
+        AFRAME.registerComponent('proximity-pause', {
+            schema: { distance: {type: 'number', default: 3} },
+            init: function () {
+                this.cameraEl = document.querySelector('#camera');
+                this.camPos = new THREE.Vector3();
+                this.worldPos = new THREE.Vector3();
+            },
+            tick: function () {
+                if (!this.cameraEl || !this.cameraEl.object3D) return;
+                
+                this.cameraEl.object3D.getWorldPosition(this.camPos);
+                this.el.object3D.getWorldPosition(this.worldPos);
+                
+                var isNear = this.worldPos.distanceTo(this.camPos) < this.data.distance;
+                
+                if (this.el.components['random-walker']) {
+                    this.el.components['random-walker'].pauseWalker = isNear;
+                }
+                
+                if (!this.planeEl) {
+                    this.planeEl = this.el.querySelector('.interactive');
+                }
+                if (this.planeEl && this.planeEl.components['sprite-sheet-anim']) {
+                    var anim = this.planeEl.components['sprite-sheet-anim'];
+                    if (isNear && !anim.pauseAnim) {
+                        anim.pauseAnim = true;
+                        anim.currentFrame = 0;
+                        anim.updateFrame();
+                    } else if (!isNear && anim.pauseAnim) {
+                        anim.pauseAnim = false;
+                    }
+                }
+            }
+        });
+
         AFRAME.registerComponent('character-spawner', {
             schema: {
-                count: {type: 'int', default: 10},
+                count: {type: 'int', default: 6},
                 radius: {type: 'number', default: 15}
             },
             init: function () {
@@ -119,18 +158,35 @@
                 }
             },
             spawnCharacters: function () {
+                var characterNames = [
+                    "Havel s krátkými kalhoty",
+                    "Casual Havel",
+                    "Ha-V-el",
+                    "Mladý Havel",
+                    "Havel s mikrofonem",
+                    "Vězeň Havel"
+                ];
+
                 for (var i = 0; i < this.data.count; i++) {
                     var x = (Math.random() * 2 - 1) * this.data.radius;
                     var z = (Math.random() * 2 - 1) * this.data.radius;
                     var character = document.createElement('a-entity');
-                    character.setAttribute('position', x + ' 1.2 ' + z);
+                    
+                    character.setAttribute('position', x + ' 0.8 ' + z);
                     character.setAttribute('face-camera', '');
                     character.setAttribute('random-walker', 'radius: ' + this.data.radius + '; speed: ' + (0.6 + Math.random() * 0.6) + '; changeInterval: ' + (2000 + Math.random() * 3000));
+                    character.setAttribute('proximity-pause', 'distance: 3');
 
                     var plane = document.createElement('a-plane');
+                    plane.setAttribute('class', 'interactive');
                     plane.setAttribute('width', '1');
                     plane.setAttribute('height', '1.6');
-                    plane.setAttribute('material', 'shader: flat; src: #havelSprite; transparent: true; alphaTest: 0.5; repeat: 0.2 1');
+                    plane.setAttribute('data-audio-index', i + 1);
+                    plane.setAttribute('data-name', characterNames[i]);
+                    
+                    var texture = 'assets/havel_walk_' + (i + 1) + '.png';
+                    
+                    plane.setAttribute('material', 'shader: flat; src: ' + texture + '; transparent: true; alphaTest: 0.5; repeat: 0.2 1');
                     plane.setAttribute('sprite-sheet-anim', 'rows: 1; columns: 5; frameRate: 6; loop: true');
                     plane.setAttribute('position', '0 0 0');
                     character.appendChild(plane);
@@ -142,64 +198,133 @@
 
         AFRAME.registerComponent('quote-displayer', {
             init: function () {
-                this.quotes = [];
+                this.quotes = {};
                 this.quoteGroup = document.querySelector('#quoteGroup');
                 this.quoteText = document.querySelector('#quoteText');
-                this.soundEl = document.querySelector('#quoteSound');
-                this.audioAsset = this.createAudioAsset();
+                this.nameText = document.querySelector('#nameText');
+                
+                this.statsCharText = document.querySelector('#statsCharText');
+                this.statsQuoteText = document.querySelector('#statsQuoteText');
+                
+                this.audioAssets = {};
+                this.currentAudioIndex = null;
+                this.currentName = "";
+                
+                this.lastInteractTime = 0;
+
+                this.talkedToCharacters = new Set();
+                this.heardQuotes = new Set();
+
+                for (var i = 1; i <= 6; i++) {
+                    var audio = new Audio();
+                    audio.preload = 'auto';
+                    audio.crossOrigin = 'anonymous';
+                    audio.muted = false;
+                    audio.volume = 1.0;
+                    audio.src = 'assets/audio_' + i + '.wav';
+                    audio.load();
+                    this.audioAssets[i] = audio;
+
+                    this.quotes[i] = [];
+                    this.loadQuotes(i);
+                }
+
+                this.onInteract = this.onInteract.bind(this);
+
                 window.addEventListener('pointerdown', this.unlockAudio.bind(this), { once: true });
-                fetch('assets/citaty.txt')
+                this.el.sceneEl.addEventListener('click', this.onInteract);
+            },
+            loadQuotes: function (index) {
+                fetch('assets/citaty_' + index + '.txt')
                     .then(function (response) { return response.text(); })
                     .then(function (text) {
-                        this.quotes = text.split(/\r?\n/).map(function (line) { return line.trim(); }).filter(Boolean);
-                        if (this.quotes.length) {
-                            this.showQuote();
-                            this.interval = setInterval(this.showQuote.bind(this), 5000);
-                        }
-                    }.bind(this));
-            },
-            createAudioAsset: function () {
-                var audio = new Audio();
-                audio.preload = 'auto';
-                audio.crossOrigin = 'anonymous';
-                audio.muted = false;
-                audio.volume = 1.0;
-                if (audio.canPlayType('audio/ogg')) {
-                    audio.src = 'assets/myslim_si_ze.ogg';
-                } else if (audio.canPlayType('audio/mpeg')) {
-                    audio.src = 'assets/myslim_si_ze.mp3';
-                } else {
-                    audio.src = 'assets/myslim_si_ze.wav';
-                }
-                audio.load();
-                return audio;
+                        this.quotes[index] = text.split(/\r?\n/).map(function (line) { return line.trim(); }).filter(Boolean);
+                    }.bind(this))
+                    .catch(function (error) { console.warn('Could not load quotes for character ' + index); });
             },
             unlockAudio: function () {
-                if (!this.audioAsset) { return; }
-                this.audioAsset.currentTime = 0;
-                this.audioAsset.play().then(function () {
-                    this.audioAsset.pause();
-                    this.audioAsset.currentTime = 0;
-                }.bind(this)).catch(function () {});
+                Object.keys(this.audioAssets).forEach(function (key) {
+                    var audio = this.audioAssets[key];
+                    audio.currentTime = 0;
+                    audio.play().then(function () {
+                        audio.pause();
+                        audio.currentTime = 0;
+                    }).catch(function () {});
+                }.bind(this));
+            },
+            onInteract: function (evt) {
+                var now = Date.now();
+                if (now - this.lastInteractTime < 50) { return; } // Debounce changed to 50ms
+                this.lastInteractTime = now;
+
+                var target = evt.detail && evt.detail.intersectedEl ? evt.detail.intersectedEl : evt.target;
+                if (!target || !target.classList || !target.classList.contains('interactive')) { return; }
+
+                var cam = document.querySelector('#camera');
+                if (!cam || !cam.object3D) { return; }
+
+                var camPos = new THREE.Vector3();
+                var charPos = new THREE.Vector3();
+                cam.object3D.getWorldPosition(camPos);
+                target.object3D.getWorldPosition(charPos);
+                if (camPos.distanceTo(charPos) > 3) { return; }
+
+                this.currentAudioIndex = target.getAttribute('data-audio-index');
+                this.currentName = target.getAttribute('data-name');
+                
+                if (!this.quotes[this.currentAudioIndex] || !this.quotes[this.currentAudioIndex].length) { return; }
+
+                this.followTarget = target;
+                this.updateQuotePosition();
+                this.showQuote();
+            },
+            tick: function () {
+                if (this.followTarget && this.quoteGroup.getAttribute('visible')) {
+                    this.updateQuotePosition();
+                }
+            },
+            updateQuotePosition: function () {
+                if (!this.followTarget || !this.followTarget.object3D) { return; }
+                var targetPos = new THREE.Vector3();
+                this.followTarget.object3D.getWorldPosition(targetPos);
+                targetPos.y += 1.2; // Lowered the bubble position from 1.3 to 1.0
+                this.quoteGroup.setAttribute('position', targetPos.x + ' ' + targetPos.y + ' ' + targetPos.z);
             },
             showQuote: function () {
-                if (!this.quotes.length) { return; }
-                var quote = this.quotes[Math.floor(Math.random() * this.quotes.length)];
+                var charQuotes = this.quotes[this.currentAudioIndex];
+                if (!charQuotes || !charQuotes.length) { return; }
+                var quote = charQuotes[Math.floor(Math.random() * charQuotes.length)];
+                
+                this.talkedToCharacters.add(this.currentAudioIndex);
+                this.heardQuotes.add(quote);
+                
+                if (this.statsCharText) {
+                    this.statsCharText.setAttribute('value', this.talkedToCharacters.size.toString());
+                }
+                if (this.statsQuoteText) {
+                    this.statsQuoteText.setAttribute('value', this.heardQuotes.size.toString());
+                }
+
+                this.nameText.setAttribute('value', this.currentName);
                 this.quoteText.setAttribute('value', quote);
                 this.quoteGroup.setAttribute('visible', 'true');
-                if (this.soundEl && this.soundEl.components && this.soundEl.components.sound) {
-                    this.soundEl.components.sound.playSound();
+                
+                if (this.currentAudioIndex && this.audioAssets[this.currentAudioIndex]) {
+                    var activeAudio = this.audioAssets[this.currentAudioIndex];
+                    activeAudio.currentTime = 0;
+                    activeAudio.play().catch(function () {});
                 }
-                if (this.audioAsset) {
-                    this.audioAsset.currentTime = 0;
-                    this.audioAsset.play().catch(function () {});
-                }
+
                 clearTimeout(this.hideTimeout);
                 this.hideTimeout = setTimeout(function () {
                     this.quoteGroup.setAttribute('visible', 'false');
-                }.bind(this), 4000);
+                    this.followTarget = null;
+                }.bind(this), 20000);
             },
             remove: function () {
+                if (this.el.sceneEl) {
+                    this.el.sceneEl.removeEventListener('click', this.onInteract);
+                }
                 clearInterval(this.interval);
                 clearTimeout(this.hideTimeout);
             }
@@ -207,42 +332,60 @@
     </script>
 </head>
 <body>
-    <a-scene character-spawner="count: 10; radius: 15">
+    <a-scene character-spawner="count: 6; radius: 30">
         <a-assets>
-            <img id="havelSprite" src="assets/havel_walk_1.png" crossorigin="anonymous" />
             <img id="panorama" src="assets/panorama1.png" crossorigin="anonymous" />
             <img id="groundTexture" src="assets/tile.png" crossorigin="anonymous" />
-            <audio id="quoteSoundAsset" crossorigin="anonymous" preload="auto">
-                <source src="assets/myslim_si_ze.ogg" type="audio/ogg">
-                <source src="assets/myslim_si_ze.mp3" type="audio/mpeg">
-                <source src="assets/myslim_si_ze.wav" type="audio/wav">
-            </audio>
         </a-assets>
 
-        <a-entity id="cameraRig" position="0 1.6 0">
-            <a-entity id="camera" camera look-controls wasd-controls="acceleration: 50" position="0 0 0"></a-entity>
+        <a-entity id="cameraRig" position="0 1.3 0">
+            <a-entity id="camera" camera look-controls wasd-controls="acceleration: 50" position="0 0 0">
+                <a-entity cursor="rayOrigin: mouse"></a-entity>
+                
+                <a-entity id="hud" position="0 -0.6 -1" scale="0.7 0.7 0.7" quote-displayer>
+                    <a-plane width="2.4" height="0.15" color="#000" opacity="0.6" position="0 -0.025 -0.01"></a-plane>
+                    
+                    <!-- Characters section -->
+                    <a-text material="msdf" align="right" position="-0.18 0 0" 
+                            value="Havlové potkáni:" width="2.4" wrap-count="60" color="#aaaaaa" 
+                            font="assets/Tiny5-Regular-msdf.json" font-image="assets/Tiny5-Regular.png" negate="false"></a-text>
+                    <a-text id="statsCharText" material="msdf" align="right" position="-0.1 0 0" 
+                            value="0" width="2.4" wrap-count="60" color="#ffffff" 
+                            font="assets/Tiny5-Regular-msdf.json" font-image="assets/Tiny5-Regular.png" negate="false"></a-text>
+                    <a-text material="msdf" align="left" position="-0.1 0 0" 
+                            value="/6" width="2.4" wrap-count="60" color="#aaaaaa" 
+                            font="assets/Tiny5-Regular-msdf.json" font-image="assets/Tiny5-Regular.png" negate="false"></a-text>
+
+                    <!-- Separator -->
+                    <a-text material="msdf" align="center" position="0.16 0 0" 
+                            value="|" width="2.4" wrap-count="60" color="#555555" 
+                            font="assets/Tiny5-Regular-msdf.json" font-image="assets/Tiny5-Regular.png" negate="false"></a-text>
+
+                    <!-- Quotes section -->
+                    <a-text material="msdf" align="right" position="0.85 0 0" 
+                            value="Vyslechnutá moudra:" width="2.4" wrap-count="60" color="#aaaaaa" 
+                            font="assets/Tiny5-Regular-msdf.json" font-image="assets/Tiny5-Regular.png" negate="false"></a-text>
+                    <a-text id="statsQuoteText" material="msdf" align="right" position="0.95 0 0" 
+                            value="0" width="2.4" wrap-count="60" color="#ffffff" 
+                            font="assets/Tiny5-Regular-msdf.json" font-image="assets/Tiny5-Regular.png" negate="false"></a-text>
+                    <a-text material="msdf" align="left" position="0.95 0 0" 
+                            value="/36" width="2.4" wrap-count="60" color="#aaaaaa" 
+                            font="assets/Tiny5-Regular-msdf.json" font-image="assets/Tiny5-Regular.png" negate="false"></a-text>
+                </a-entity>
+            </a-entity>
         </a-entity>
 
-        <a-entity id="quoteGroup" position="0 2.4 -2" visible="false" face-camera quote-displayer>
-            <a-plane width="2.6" height="0.8" color="#000" opacity="0.6" position="0 0 0"></a-plane>
-            <a-text id="quoteText" position="0 0 0.01" value="" align="center" width="2.4" color="#fff" font="url(pix_sans.json)"></a-text>
-            <a-entity id="quoteSound" sound="src: #quoteSoundAsset; autoplay: false"></a-entity>
+        <a-entity id="quoteGroup" position="0 2.4 -2" scale="0.7 0.7 0.7" visible="false" face-camera>
+            <a-plane width="2.6" height="1.0" color="#000" opacity="0.6" position="0 0 0"></a-plane>
+            <a-text id="nameText" material="msdf" align="center" position="0 0.3 0.01" value="Name" width="2.8" color="#ffffff" font="assets/Tiny5-Regular-msdf.json" font-image="assets/Tiny5-Regular.png" negate="false"></a-text>
+            <a-text id="quoteText" material="msdf" align="center" position="0 -0.1 0.01" value="" width="2.4" color="#aaaaaa" font="assets/Tiny5-Regular-msdf.json" font-image="assets/Tiny5-Regular.png" negate="false"></a-text>
         </a-entity>
 
-        <!-- Repeating tiled ground plane -->
         <a-plane position="0 0 0" rotation="-90 0 0" width="100" height="100"
-                 material="shader: flat; src: #groundTexture; repeat: 20 20">
+                 material="shader: flat; src: #groundTexture; repeat: 50 50">
         </a-plane>
         
-        <!-- Panorama background -->
         <a-sky src="#panorama" rotation="0 180 0"></a-sky>
-
-        <!-- Animated character plane always facing the camera -->
-        <a-plane position="0 1.2 -2" width="1" height="1.6"
-                 material="shader: flat; src: #havelSprite; transparent: true; alphaTest: 0.5; repeat: 0.2 1"
-                 face-camera
-                 sprite-sheet-anim="rows: 1; columns: 5; frameRate: 2; loop: true">
-        </a-plane>
     </a-scene>
 </body>
 </html>
