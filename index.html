@@ -329,7 +329,7 @@
                 if (!this.followTarget || !this.followTarget.object3D) { return; }
                 var targetPos = new THREE.Vector3();
                 this.followTarget.object3D.getWorldPosition(targetPos);
-                targetPos.y += 0.85;
+                targetPos.y += 1.1;
                 this.quoteGroup.setAttribute('position', targetPos.x + ' ' + targetPos.y + ' ' + targetPos.z);
             },
             showQuote: function () {
