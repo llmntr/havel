@@ -383,16 +383,16 @@
 
         <a-entity id="cameraRig" position="0 -0.5 0">
             <a-entity id="camera" camera position="0 1.6 0" look-controls wasd-controls="acceleration: 50">
-                <a-entity id="hud" position="0 -0.6 -1.2" scale="0.7 0.7 0.7" quote-displayer>
+                <a-entity id="hud" position="0 -0.6 -1.2" scale="0.5 0.5 0.5" quote-displayer>
                     <a-plane width="2.4" height="0.15" color="#000" opacity="0.6" position="0 -0.025 -0.01"></a-plane>
                     
-                    <a-text material="msdf" align="right" position="-0.18 0 0" 
+                    <a-text material="msdf" align="right" position="-0.4 0 0" 
                             value="Havlové potkáni:" width="2.4" wrap-count="60" color="#aaaaaa" 
                             font="assets/Tiny5-Regular-msdf.json" font-image="assets/Tiny5-Regular.png" negate="false"></a-text>
-                    <a-text id="statsCharText" material="msdf" align="right" position="-0.1 0 0" 
+                    <a-text id="statsCharText" material="msdf" align="right" position="-0.3 0 0" 
                             value="0" width="2.4" wrap-count="60" color="#ffffff" 
                             font="assets/Tiny5-Regular-msdf.json" font-image="assets/Tiny5-Regular.png" negate="false"></a-text>
-                    <a-text material="msdf" align="left" position="-0.1 0 0" 
+                    <a-text material="msdf" align="left" position="-0.3 0 0" 
                             value="/6" width="2.4" wrap-count="60" color="#aaaaaa" 
                             font="assets/Tiny5-Regular-msdf.json" font-image="assets/Tiny5-Regular.png" negate="false"></a-text>
 
@@ -400,13 +400,13 @@
                             value="|" width="2.4" wrap-count="60" color="#555555" 
                             font="assets/Tiny5-Regular-msdf.json" font-image="assets/Tiny5-Regular.png" negate="false"></a-text>
 
-                    <a-text material="msdf" align="right" position="0.85 0 0" 
+                    <a-text material="msdf" align="right" position="0.75 0 0" 
                             value="Vyslechnutá moudra:" width="2.4" wrap-count="60" color="#aaaaaa" 
                             font="assets/Tiny5-Regular-msdf.json" font-image="assets/Tiny5-Regular.png" negate="false"></a-text>
-                    <a-text id="statsQuoteText" material="msdf" align="right" position="0.95 0 0" 
+                    <a-text id="statsQuoteText" material="msdf" align="right" position="0.85 0 0" 
                             value="0" width="2.4" wrap-count="60" color="#ffffff" 
                             font="assets/Tiny5-Regular-msdf.json" font-image="assets/Tiny5-Regular.png" negate="false"></a-text>
-                    <a-text material="msdf" align="left" position="0.95 0 0" 
+                    <a-text material="msdf" align="left" position="0.85 0 0" 
                             value="/36" width="2.4" wrap-count="60" color="#aaaaaa" 
                             font="assets/Tiny5-Regular-msdf.json" font-image="assets/Tiny5-Regular.png" negate="false"></a-text>
                 </a-entity>
@@ -416,7 +416,7 @@
             <a-entity laser-controls="hand: right" raycaster="objects: .interactive; far: 5" thumbstick-movement="speed: 2.5"></a-entity>
         </a-entity>
 
-        <a-entity id="quoteGroup" position="0 2.4 -2" scale="0.7 0.7 0.7" visible="false" face-camera>
+        <a-entity id="quoteGroup" position="0 2 -2" scale="0.5 0.5 0.5" visible="false" face-camera>
             <a-plane width="2.6" height="1.0" color="#000" opacity="0.6" position="0 0 0"></a-plane>
             <a-text id="nameText" material="msdf" align="center" position="0 0.3 0.01" value="Name" width="2.8" color="#ffffff" font="assets/Tiny5-Regular-msdf.json" font-image="assets/Tiny5-Regular.png" negate="false"></a-text>
             <a-text id="quoteText" material="msdf" align="center" position="0 -0.1 0.01" value="" width="2.4" color="#aaaaaa" font="assets/Tiny5-Regular-msdf.json" font-image="assets/Tiny5-Regular.png" negate="false"></a-text>
