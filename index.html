@@ -12,10 +12,66 @@
             schema: {
                 speed: {type: 'number', default: 2.5} // Movement speed in meters per second
             },
-            init: function () {
-                this.axisX = 0;
-                this.axisY = 0;
-                this.el.addEventListener('thumbstickmoved', this.onThumbstickMoved.bind(this));
+init: function () {
+                this.quotes = {};
+                this.quoteGroup = document.querySelector('#quoteGroup');
+                this.quoteText = document.querySelector('#quoteText');
+                this.nameText = document.querySelector('#nameText');
+                
+                this.statsCharText = document.querySelector('#statsCharText');
+                this.statsQuoteText = document.querySelector('#statsQuoteText');
+                
+                this.audioAssets = {};
+                this.currentAudioIndex = null;
+                this.currentName = "";
+                
+                this.lastInteractTime = 0;
+
+                this.talkedToCharacters = new Set();
+                this.heardQuotes = new Set();
+
+                for (var i = 1; i <= 6; i++) {
+                    var audio = document.createElement('audio');
+                    audio.preload = 'auto';
+                    audio.crossOrigin = 'anonymous';
+                    audio.muted = false;
+                    audio.volume = 1.0;
+
+                    var exts = ['ogg', 'mp3', 'wav'];
+                    for (var j = 0; j < exts.length; j++) {
+                        var source = document.createElement('source');
+                        source.src = 'assets/audio_1.' + exts[j];
+                        source.type = 'audio/' + (exts[j] === 'mp3' ? 'mpeg' : exts[j]);
+                        audio.appendChild(source);
+                    }
+
+                    audio.load();
+                    this.audioAssets[i] = audio;
+
+                    this.quotes[i] = [];
+                    this.loadQuotes(i);
+                }
+
+                this.onInteract = this.onInteract.bind(this);
+                this.el.sceneEl.addEventListener('click', this.onInteract);
+
+                // --- NEW VR-FRIENDLY AUDIO UNLOCK ---
+                var unlock = function () {
+                    this.unlockAudio();
+                    this.el.sceneEl.removeEventListener('mousedown', unlock);
+                    this.el.sceneEl.removeEventListener('triggerdown', unlock);
+                }.bind(this);
+
+                // Listen on the scene for both desktop clicks and VR trigger pulls
+                if (this.el.sceneEl.hasLoaded) {
+                    this.el.sceneEl.addEventListener('mousedown', unlock);
+                    this.el.sceneEl.addEventListener('triggerdown', unlock);
+                } else {
+                    this.el.sceneEl.addEventListener('loaded', function() {
+                        this.el.sceneEl.addEventListener('mousedown', unlock);
+                        this.el.sceneEl.addEventListener('triggerdown', unlock);
+                    }.bind(this));
+                }
             },
             onThumbstickMoved: function (evt) {
                 // Apply a small deadzone to prevent drift
@@ -391,7 +447,7 @@
         <!-- Main Rig: Dropped movement-controls entirely to rely on custom thumbstick script -->
         <a-entity id="cameraRig" position="0 0 0">
             <!-- Camera tracking takes care of head orientation inherently -->
-            <a-entity id="camera" camera position="0 1.6 0" look-controls wasd-controls="acceleration: 50">
+            <a-entity id="camera" camera position="0 1.45 0" look-controls wasd-controls="acceleration: 50">
                 <a-entity id="hud" position="0 -0.6 -1.2" scale="0.7 0.7 0.7" quote-displayer>
                     <a-plane width="2.4" height="0.15" color="#000" opacity="0.6" position="0 -0.025 -0.01"></a-plane>
                     
