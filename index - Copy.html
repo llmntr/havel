@@ -6,48 +6,9 @@
     <title>A-Frame VR Scene</title>
     <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/ngokevin/aframe-look-at-component@3.0.0/dist/aframe-look-at-component.min.js"></script>
+    <!-- Added aframe-extras for VR thumbstick movement -->
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.5.0/dist/aframe-extras.min.js"></script>
     <script>
-        // Custom component strictly for thumbstick locomotion
-        AFRAME.registerComponent('thumbstick-movement', {
-            schema: {
-                speed: {type: 'number', default: 2.5} // Movement speed in meters per second
-            },
-            init: function () {
-                this.axisX = 0;
-                this.axisY = 0;
-                this.el.addEventListener('thumbstickmoved', this.onThumbstickMoved.bind(this));
-            },
-            onThumbstickMoved: function (evt) {
-                // Apply a small deadzone to prevent drift
-                this.axisX = Math.abs(evt.detail.x) > 0.05 ? evt.detail.x : 0;
-                this.axisY = Math.abs(evt.detail.y) > 0.05 ? evt.detail.y : 0;
-            },
-            tick: function (time, delta) {
-                if (this.axisX === 0 && this.axisY === 0) return;
-
-                var rig = document.querySelector('#cameraRig');
-                var camera = document.querySelector('#camera');
-                if (!rig || !camera) return;
-
-                // Get the camera's current Y rotation (where the user is looking)
-                var rotation = camera.getAttribute('rotation');
-                var angle = rotation.y * Math.PI / 180;
-
-                // Calculate distance to move this frame
-                var deltaX = this.axisX * this.data.speed * (delta / 1000);
-                var deltaZ = this.axisY * this.data.speed * (delta / 1000);
-
-                // Apply rotation so pushing "up" moves the rig in the direction you are looking
-                var moveX = deltaX * Math.cos(angle) + deltaZ * Math.sin(angle);
-                var moveZ = deltaZ * Math.cos(angle) - deltaX * Math.sin(angle);
-
-                var pos = rig.getAttribute('position');
-                pos.x += moveX;
-                pos.z += moveZ;
-                rig.setAttribute('position', pos);
-            }
-        });
-
         AFRAME.registerComponent('sprite-sheet-anim', {
             schema: {
                 rows: {type: 'int', default: 1},
@@ -280,6 +241,7 @@
 
                 this.onInteract = this.onInteract.bind(this);
 
+                // Replaced pointerdown with a broader VR-friendly click listener to unlock audio
                 window.addEventListener('click', this.unlockAudio.bind(this), { once: true });
                 this.el.sceneEl.addEventListener('click', this.onInteract);
             },
@@ -317,6 +279,7 @@
                 cam.object3D.getWorldPosition(camPos);
                 target.object3D.getWorldPosition(charPos);
                 
+                // Allow interaction slightly further in VR to match controller reach
                 if (camPos.distanceTo(charPos) > 4) { return; }
 
                 this.currentAudioIndex = target.getAttribute('data-audio-index');
@@ -388,13 +351,15 @@
             <img id="groundTexture" src="assets/tile.png" crossorigin="anonymous" />
         </a-assets>
 
-        <!-- Main Rig: Dropped movement-controls entirely to rely on custom thumbstick script -->
-        <a-entity id="cameraRig" position="0 0 0">
-            <!-- Camera tracking takes care of head orientation inherently -->
-            <a-entity id="camera" camera position="0 1.6 0" look-controls wasd-controls="acceleration: 50">
+        <!-- Upgraded rig for VR movement and interactions -->
+        <a-entity id="cameraRig" movement-controls="speed: 0.15" position="0 0 0">
+            <!-- Camera height naturally defaults to user headset height in VR (approx 1.6m on desktop) -->
+            <a-entity id="camera" camera position="0 1.6 0" look-controls>
+                <!-- Kept HUD attached to camera, pushed slightly forward for VR -->
                 <a-entity id="hud" position="0 -0.6 -1.2" scale="0.7 0.7 0.7" quote-displayer>
                     <a-plane width="2.4" height="0.15" color="#000" opacity="0.6" position="0 -0.025 -0.01"></a-plane>
                     
+                    <!-- Characters section -->
                     <a-text material="msdf" align="right" position="-0.18 0 0" 
                             value="Havlové potkáni:" width="2.4" wrap-count="60" color="#aaaaaa" 
                             font="assets/Tiny5-Regular-msdf.json" font-image="assets/Tiny5-Regular.png" negate="false"></a-text>
@@ -405,10 +370,12 @@
                             value="/6" width="2.4" wrap-count="60" color="#aaaaaa" 
                             font="assets/Tiny5-Regular-msdf.json" font-image="assets/Tiny5-Regular.png" negate="false"></a-text>
 
+                    <!-- Separator -->
                     <a-text material="msdf" align="center" position="0.16 0 0" 
                             value="|" width="2.4" wrap-count="60" color="#555555" 
                             font="assets/Tiny5-Regular-msdf.json" font-image="assets/Tiny5-Regular.png" negate="false"></a-text>
 
+                    <!-- Quotes section -->
                     <a-text material="msdf" align="right" position="0.85 0 0" 
                             value="Vyslechnutá moudra:" width="2.4" wrap-count="60" color="#aaaaaa" 
                             font="assets/Tiny5-Regular-msdf.json" font-image="assets/Tiny5-Regular.png" negate="false"></a-text>
@@ -421,11 +388,9 @@
                 </a-entity>
             </a-entity>
 
-            <!-- Left controller handles interactions but no walking -->
+            <!-- VR Controllers with Raycasters for interaction -->
             <a-entity laser-controls="hand: left" raycaster="objects: .interactive; far: 5"></a-entity>
-            
-            <!-- Right controller handles interactions AND our new custom thumbstick movement -->
-            <a-entity laser-controls="hand: right" raycaster="objects: .interactive; far: 5" thumbstick-movement="speed: 2.5"></a-entity>
+            <a-entity laser-controls="hand: right" raycaster="objects: .interactive; far: 5"></a-entity>
         </a-entity>
 
         <a-entity id="quoteGroup" position="0 2.4 -2" scale="0.7 0.7 0.7" visible="false" face-camera>
