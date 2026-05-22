@@ -9,91 +9,27 @@
     <script>
         // Custom component strictly for thumbstick locomotion
         AFRAME.registerComponent('thumbstick-movement', {
-            schema: {
-                speed: {type: 'number', default: 2.5} // Movement speed in meters per second
-            },
-init: function () {
-                this.quotes = {};
-                this.quoteGroup = document.querySelector('#quoteGroup');
-                this.quoteText = document.querySelector('#quoteText');
-                this.nameText = document.querySelector('#nameText');
-                
-                this.statsCharText = document.querySelector('#statsCharText');
-                this.statsQuoteText = document.querySelector('#statsQuoteText');
-                
-                this.audioAssets = {};
-                this.currentAudioIndex = null;
-                this.currentName = "";
-                
-                this.lastInteractTime = 0;
-
-                this.talkedToCharacters = new Set();
-                this.heardQuotes = new Set();
-
-                for (var i = 1; i <= 6; i++) {
-                    var audio = document.createElement('audio');
-                    audio.preload = 'auto';
-                    audio.crossOrigin = 'anonymous';
-                    audio.muted = false;
-                    audio.volume = 1.0;
-
-                    var exts = ['ogg', 'mp3', 'wav'];
-                    for (var j = 0; j < exts.length; j++) {
-                        var source = document.createElement('source');
-                        source.src = 'assets/audio_1.' + exts[j];
-                        source.type = 'audio/' + (exts[j] === 'mp3' ? 'mpeg' : exts[j]);
-                        audio.appendChild(source);
-                    }
-
-                    audio.load();
-                    this.audioAssets[i] = audio;
-
-                    this.quotes[i] = [];
-                    this.loadQuotes(i);
-                }
-
-                this.onInteract = this.onInteract.bind(this);
-                this.el.sceneEl.addEventListener('click', this.onInteract);
-
-                // --- NEW VR-FRIENDLY AUDIO UNLOCK ---
-                var unlock = function () {
-                    this.unlockAudio();
-                    this.el.sceneEl.removeEventListener('mousedown', unlock);
-                    this.el.sceneEl.removeEventListener('triggerdown', unlock);
-                }.bind(this);
-
-                // Listen on the scene for both desktop clicks and VR trigger pulls
-                if (this.el.sceneEl.hasLoaded) {
-                    this.el.sceneEl.addEventListener('mousedown', unlock);
-                    this.el.sceneEl.addEventListener('triggerdown', unlock);
-                } else {
-                    this.el.sceneEl.addEventListener('loaded', function() {
-                        this.el.sceneEl.addEventListener('mousedown', unlock);
-                        this.el.sceneEl.addEventListener('triggerdown', unlock);
-                    }.bind(this));
-                }
+            schema: { speed: {type: 'number', default: 2.5} },
+            init: function () {
+                this.axisX = 0;
+                this.axisY = 0;
+                this.el.addEventListener('thumbstickmoved', this.onThumbstickMoved.bind(this));
             },
             onThumbstickMoved: function (evt) {
-                // Apply a small deadzone to prevent drift
                 this.axisX = Math.abs(evt.detail.x) > 0.05 ? evt.detail.x : 0;
                 this.axisY = Math.abs(evt.detail.y) > 0.05 ? evt.detail.y : 0;
             },
             tick: function (time, delta) {
                 if (this.axisX === 0 && this.axisY === 0) return;
-
                 var rig = document.querySelector('#cameraRig');
                 var camera = document.querySelector('#camera');
                 if (!rig || !camera) return;
 
-                // Get the camera's current Y rotation (where the user is looking)
                 var rotation = camera.getAttribute('rotation');
                 var angle = rotation.y * Math.PI / 180;
-
-                // Calculate distance to move this frame
                 var deltaX = this.axisX * this.data.speed * (delta / 1000);
                 var deltaZ = this.axisY * this.data.speed * (delta / 1000);
 
-                // Apply rotation so pushing "up" moves the rig in the direction you are looking
                 var moveX = deltaX * Math.cos(angle) + deltaZ * Math.sin(angle);
                 var moveZ = deltaZ * Math.cos(angle) - deltaX * Math.sin(angle);
 
@@ -176,11 +112,7 @@ init: function () {
                 var z = (Math.random() * 2 - 1) * this.data.radius;
                 this.target.set(x, 0, z);
                 var pos = this.el.getAttribute('position');
-                this.direction.set(
-                    this.target.x - pos.x,
-                    0,
-                    this.target.z - pos.z
-                );
+                this.direction.set(this.target.x - pos.x, 0, this.target.z - pos.z);
                 this.direction.y = 0;
                 var distance = this.direction.length();
                 if (distance > 0.001) {
@@ -219,7 +151,6 @@ init: function () {
                 
                 this.cameraEl.object3D.getWorldPosition(this.camPos);
                 this.el.object3D.getWorldPosition(this.worldPos);
-                
                 var isNear = this.worldPos.distanceTo(this.camPos) < this.data.distance;
                 
                 if (this.el.components['random-walker']) {
@@ -243,10 +174,7 @@ init: function () {
         });
 
         AFRAME.registerComponent('character-spawner', {
-            schema: {
-                count: {type: 'int', default: 6},
-                radius: {type: 'number', default: 15}
-            },
+            schema: { count: {type: 'int', default: 6}, radius: {type: 'number', default: 15} },
             init: function () {
                 if (this.el.hasLoaded) {
                     this.spawnCharacters();
@@ -256,12 +184,8 @@ init: function () {
             },
             spawnCharacters: function () {
                 var characterNames = [
-                    "Havel s krátkými kalhotami",
-                    "Casual Havel",
-                    "Ha-V-el",
-                    "Mladý Havel",
-                    "Havel s mikrofonem",
-                    "Vězeň Havel"
+                    "Havel s krátkými kalhotami", "Casual Havel", "Ha-V-el",
+                    "Mladý Havel", "Havel s mikrofonem", "Vězeň Havel"
                 ];
 
                 for (var i = 0; i < this.data.count; i++) {
@@ -306,9 +230,7 @@ init: function () {
                 this.audioAssets = {};
                 this.currentAudioIndex = null;
                 this.currentName = "";
-                
                 this.lastInteractTime = 0;
-
                 this.talkedToCharacters = new Set();
                 this.heardQuotes = new Set();
 
@@ -329,15 +251,29 @@ init: function () {
 
                     audio.load();
                     this.audioAssets[i] = audio;
-
                     this.quotes[i] = [];
                     this.loadQuotes(i);
                 }
 
                 this.onInteract = this.onInteract.bind(this);
+                
+                var scene = document.querySelector('a-scene');
+                if (scene) {
+                    scene.addEventListener('click', this.onInteract);
+                }
 
-                window.addEventListener('click', this.unlockAudio.bind(this), { once: true });
-                this.el.sceneEl.addEventListener('click', this.onInteract);
+                var unlocked = false;
+                var unlock = function () {
+                    if (unlocked) return;
+                    unlocked = true;
+                    this.unlockAudio();
+                }.bind(this);
+
+                window.addEventListener('click', unlock, { once: true });
+                window.addEventListener('touchstart', unlock, { once: true });
+                if (scene) {
+                    scene.addEventListener('enter-vr', unlock, { once: true });
+                }
             },
             loadQuotes: function (index) {
                 fetch('assets/citaty_' + index + '.txt')
@@ -428,8 +364,9 @@ init: function () {
                 }.bind(this), 20000);
             },
             remove: function () {
-                if (this.el.sceneEl) {
-                    this.el.sceneEl.removeEventListener('click', this.onInteract);
+                var scene = document.querySelector('a-scene');
+                if (scene) {
+                    scene.removeEventListener('click', this.onInteract);
                 }
                 clearInterval(this.interval);
                 clearTimeout(this.hideTimeout);
@@ -444,9 +381,7 @@ init: function () {
             <img id="groundTexture" src="assets/tile.png" crossorigin="anonymous" />
         </a-assets>
 
-        <!-- Main Rig: Dropped movement-controls entirely to rely on custom thumbstick script -->
         <a-entity id="cameraRig" position="0 0 0">
-            <!-- Camera tracking takes care of head orientation inherently -->
             <a-entity id="camera" camera position="0 1.45 0" look-controls wasd-controls="acceleration: 50">
                 <a-entity id="hud" position="0 -0.6 -1.2" scale="0.7 0.7 0.7" quote-displayer>
                     <a-plane width="2.4" height="0.15" color="#000" opacity="0.6" position="0 -0.025 -0.01"></a-plane>
@@ -477,10 +412,7 @@ init: function () {
                 </a-entity>
             </a-entity>
 
-            <!-- Left controller handles interactions but no walking -->
             <a-entity laser-controls="hand: left" raycaster="objects: .interactive; far: 5"></a-entity>
-            
-            <!-- Right controller handles interactions AND our new custom thumbstick movement -->
             <a-entity laser-controls="hand: right" raycaster="objects: .interactive; far: 5" thumbstick-movement="speed: 2.5"></a-entity>
         </a-entity>
 
@@ -490,10 +422,7 @@ init: function () {
             <a-text id="quoteText" material="msdf" align="center" position="0 -0.1 0.01" value="" width="2.4" color="#aaaaaa" font="assets/Tiny5-Regular-msdf.json" font-image="assets/Tiny5-Regular.png" negate="false"></a-text>
         </a-entity>
 
-        <a-plane position="0 0 0" rotation="-90 0 0" width="100" height="100"
-                 material="shader: flat; src: #groundTexture; repeat: 50 50">
-        </a-plane>
-        
+        <a-plane position="0 0 0" rotation="-90 0 0" width="100" height="100" material="shader: flat; src: #groundTexture; repeat: 50 50"></a-plane>
         <a-sky src="#panorama" rotation="0 180 0"></a-sky>
     </a-scene>
 </body>
