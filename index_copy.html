@@ -40,55 +40,6 @@
             }
         });
 
-        // Custom component for mobile touch movement
-        AFRAME.registerComponent('touch-movement', {
-            schema: { speed: {type: 'number', default: 2.5} },
-            init: function () {
-                this.axisX = 0;
-                this.axisY = 0;
-                this.touchStart = null;
-                
-                window.addEventListener('touchstart', (e) => {
-                    this.touchStart = { x: e.touches[0].pageX, y: e.touches[0].pageY };
-                });
-                
-                window.addEventListener('touchmove', (e) => {
-                    if (!this.touchStart) return;
-                    var deltaX = e.touches[0].pageX - this.touchStart.x;
-                    var deltaY = e.touches[0].pageY - this.touchStart.y;
-                    
-                    // Normalize joystick movement between -1 and 1
-                    this.axisX = Math.max(-1, Math.min(1, deltaX / 50));
-                    this.axisY = Math.max(-1, Math.min(1, deltaY / 50));
-                });
-                
-                window.addEventListener('touchend', () => {
-                    this.touchStart = null;
-                    this.axisX = 0;
-                    this.axisY = 0;
-                });
-            },
-            tick: function (time, delta) {
-                if (this.axisX === 0 && this.axisY === 0) return;
-                var rig = document.querySelector('#cameraRig');
-                var camera = document.querySelector('#camera');
-                if (!rig || !camera) return;
-
-                var rotation = camera.getAttribute('rotation');
-                var angle = rotation.y * Math.PI / 180;
-                var deltaX = this.axisX * this.data.speed * (delta / 1000);
-                var deltaZ = this.axisY * this.data.speed * (delta / 1000);
-
-                var moveX = deltaX * Math.cos(angle) + deltaZ * Math.sin(angle);
-                var moveZ = deltaZ * Math.cos(angle) - deltaX * Math.sin(angle);
-
-                var pos = rig.getAttribute('position');
-                pos.x += moveX;
-                pos.z += moveZ;
-                rig.setAttribute('position', pos);
-            }
-        });
-
         AFRAME.registerComponent('sprite-sheet-anim', {
             schema: {
                 rows: {type: 'int', default: 1},
@@ -430,10 +381,8 @@
             <img id="groundTexture" src="assets/tile.png" crossorigin="anonymous" />
         </a-assets>
 
-        <a-entity id="cameraRig" position="0 -0.5 0" touch-movement="speed: 2.5">
-            <a-entity id="camera" camera position="0 1.6 0" look-controls="touchEnabled: false" wasd-controls="acceleration: 50">
-                <a-entity cursor="rayOrigin: mouse" raycaster="objects: .interactive; far: 5"></a-entity>
-                
+        <a-entity id="cameraRig" position="0 -0.5 0">
+            <a-entity id="camera" camera position="0 1.6 0" look-controls wasd-controls="acceleration: 50">
                 <a-entity id="hud" position="0 -0.6 -1.2" scale="0.5 0.5 0.5" quote-displayer>
                     <a-plane width="2.4" height="0.15" color="#000" opacity="0.6" position="0 -0.025 -0.01"></a-plane>
                     
