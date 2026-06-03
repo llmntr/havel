@@ -15,7 +15,7 @@
             z-index: 9999;
             background: black url('assets/controls.png') no-repeat center center;
             background-size: cover;
-            display: none; /* Hidden by default */
+            display: none;
             cursor: pointer;
         }
         #click-overlay {
@@ -37,7 +37,6 @@
     <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/ngokevin/aframe-look-at-component@3.0.0/dist/aframe-look-at-component.min.js"></script>
     <script>
-        // Welcome Screen Logic
         window.addEventListener('DOMContentLoaded', function() {
             var welcomeScreen = document.getElementById('welcome-screen');
             if (AFRAME.utils.device.isMobile()) {
@@ -50,7 +49,25 @@
             }
         });
 
-        // Custom component strictly for thumbstick locomotion
+        AFRAME.registerComponent('smart-height', {
+            schema: {
+                vrY: {type: 'number', default: -0.5},
+                flatY: {type: 'number', default: 1.0}
+            },
+            init: function () {
+                var sceneEl = this.el.sceneEl;
+                this.el.object3D.position.y = this.data.flatY;
+
+                sceneEl.addEventListener('enter-vr', () => {
+                    this.el.object3D.position.y = this.data.vrY;
+                });
+
+                sceneEl.addEventListener('exit-vr', () => {
+                    this.el.object3D.position.y = this.data.flatY;
+                });
+            }
+        });
+
         AFRAME.registerComponent('thumbstick-movement', {
             schema: { speed: {type: 'number', default: 2.5} },
             init: function () {
@@ -83,7 +100,6 @@
             }
         });
 
-        // Custom component for mobile touch movement
         AFRAME.registerComponent('touch-movement', {
             schema: { speed: {type: 'number', default: 2.5} },
             init: function () {
@@ -476,7 +492,7 @@
             <img id="groundTexture" src="assets/tile.png" crossorigin="anonymous" />
         </a-assets>
 
-        <a-entity id="cameraRig" position="0 -0.5 0" touch-movement="speed: 2.5">
+        <a-entity id="cameraRig" position="0 1.0 0" touch-movement="speed: 2.5" smart-height="vrY: -0.5; flatY: 1.0">
             <a-entity id="camera" camera position="0 1.6 0" look-controls="touchEnabled: false" wasd-controls="acceleration: 50">
                 
                 <a-entity cursor="rayOrigin: mouse" raycaster="objects: .interactive; far: 5"></a-entity>
