@@ -4,8 +4,35 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>A-Frame VR Scene</title>
-    
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400&display=swap" rel="stylesheet">
+
     <style>
+        #site-footer {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 28px;
+            z-index: 10000;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'IBM Plex Sans', sans-serif;
+            font-size: 13px;
+        }
+        #site-footer a {
+            color: #fff;
+            text-decoration: underline;
+        }
+        /* Keep A-Frame's VR/AR buttons above the footer */
+        .a-enter-vr, .a-enter-ar {
+            bottom: 48px !important;
+        }
+
         #welcome-screen {
             position: fixed;
             top: 0; 
@@ -468,6 +495,10 @@
 <body>
     <div id="welcome-screen">
         <div id="click-overlay"></div>
+    </div>
+
+    <div id="site-footer">
+        <a href="https://adamkoranda.com" target="_blank" rel="noopener">adamkoranda.com</a>
     </div>
 
     <a-scene character-spawner="count: 6; radius: 32">
